@@ -1,0 +1,17 @@
+# Build artifacts
+bin/
+build/
+*.o
+*.out
+
+# Editor backups
+*~
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IPC files (created at runtime)
+/tmp/*
