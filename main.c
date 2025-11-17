@@ -153,7 +153,6 @@ void launch_app_menu(void) {
 
     if (pid > 0) {
         printf("\n[Success] Application launched with PID %d\n", pid);
-        printf("Note: In a full implementation, this would fork and exec the actual app.\n");
     } else {
         printf("\n[Error] Failed to launch application\n");
     }
