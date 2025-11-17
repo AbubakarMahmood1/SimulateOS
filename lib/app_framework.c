@@ -15,27 +15,27 @@
 // Application descriptors for all available apps
 static AppDescriptor available_apps[] = {
     // System Applications
-    {1, "System Monitor", APP_SYSTEM, PRIORITY_HIGH, 64, 10, 1, "./apps/system_monitor"},
-    {2, "Process Manager", APP_SYSTEM, PRIORITY_HIGH, 32, 5, 1, "./apps/process_manager"},
-    {3, "File Explorer", APP_SYSTEM, PRIORITY_MEDIUM, 128, 20, 1, "./apps/file_explorer"},
-    {4, "Terminal", APP_SYSTEM, PRIORITY_HIGH, 64, 10, 1, "./apps/terminal"},
-    {5, "Settings", APP_SYSTEM, PRIORITY_LOW, 32, 5, 1, "./apps/settings"},
+    {1, "System Monitor", APP_SYSTEM, PRIORITY_HIGH, 64, 10, 1, "bin/apps/system_monitor"},
+    {2, "Process Manager", APP_SYSTEM, PRIORITY_HIGH, 32, 5, 1, "bin/apps/process_manager"},
+    {3, "File Explorer", APP_SYSTEM, PRIORITY_MEDIUM, 128, 20, 1, "bin/apps/file_explorer"},
+    {4, "Terminal", APP_SYSTEM, PRIORITY_HIGH, 64, 10, 1, "bin/apps/terminal"},
+    {5, "Settings", APP_SYSTEM, PRIORITY_LOW, 32, 5, 1, "bin/apps/settings"},
 
     // Productivity Applications
-    {6, "Notepad+", APP_PRODUCTIVITY, PRIORITY_HIGH, 64, 50, 1, "./apps/notepad"},
-    {7, "Calculator", APP_PRODUCTIVITY, PRIORITY_HIGH, 32, 5, 1, "./apps/calculator"},
-    {8, "Calendar", APP_PRODUCTIVITY, PRIORITY_MEDIUM, 48, 10, 1, "./apps/calendar"},
-    {9, "Task Scheduler", APP_PRODUCTIVITY, PRIORITY_MEDIUM, 48, 10, 1, "./apps/task_scheduler"},
+    {6, "Notepad+", APP_PRODUCTIVITY, PRIORITY_HIGH, 64, 50, 1, "bin/apps/notepad"},
+    {7, "Calculator", APP_PRODUCTIVITY, PRIORITY_HIGH, 32, 5, 1, "bin/apps/calculator"},
+    {8, "Calendar", APP_PRODUCTIVITY, PRIORITY_MEDIUM, 48, 10, 1, "bin/apps/calendar"},
+    {9, "Task Scheduler", APP_PRODUCTIVITY, PRIORITY_MEDIUM, 48, 10, 1, "bin/apps/task_scheduler"},
 
     // Utility Applications
-    {10, "File Operations", APP_UTILITY, PRIORITY_MEDIUM, 64, 20, 1, "./apps/file_ops"},
-    {11, "System Info", APP_UTILITY, PRIORITY_LOW, 32, 5, 1, "./apps/system_info"},
-    {12, "Search Tool", APP_UTILITY, PRIORITY_MEDIUM, 64, 15, 1, "./apps/search_tool"},
+    {10, "File Operations", APP_UTILITY, PRIORITY_MEDIUM, 64, 20, 1, "bin/apps/file_ops"},
+    {11, "System Info", APP_UTILITY, PRIORITY_LOW, 32, 5, 1, "bin/apps/system_info"},
+    {12, "Search Tool", APP_UTILITY, PRIORITY_MEDIUM, 64, 15, 1, "bin/apps/search_tool"},
 
     // Entertainment Applications
-    {13, "Minesweeper", APP_ENTERTAINMENT, PRIORITY_HIGH, 64, 10, 1, "./apps/minesweeper"},
-    {14, "Music Player", APP_ENTERTAINMENT, PRIORITY_MEDIUM, 96, 100, 1, "./apps/music_player"},
-    {15, "Clock & Timer", APP_ENTERTAINMENT, PRIORITY_LOW, 32, 5, 1, "./apps/clock"}
+    {13, "Minesweeper", APP_ENTERTAINMENT, PRIORITY_HIGH, 64, 10, 1, "bin/apps/minesweeper"},
+    {14, "Music Player", APP_ENTERTAINMENT, PRIORITY_MEDIUM, 96, 100, 1, "bin/apps/music_player"},
+    {15, "Clock & Timer", APP_ENTERTAINMENT, PRIORITY_LOW, 32, 5, 1, "bin/apps/clock"}
 };
 
 static int num_apps = sizeof(available_apps) / sizeof(AppDescriptor);
@@ -112,13 +112,20 @@ static int check_command_exists(const char* command) {
  * Returns: PID of child process, or -1 on failure
  */
 static pid_t launch_in_tmux(AppDescriptor* app) {
-    char tmux_cmd[1024];
+    char tmux_cmd[2048];
+    char cwd[1024];
     pid_t pid;
 
-    // Create a wrapper script to capture the PID
+    // Get current working directory
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        perror("[Terminal] Failed to get current directory");
+        return -1;
+    }
+
+    // Create tmux command that changes to the correct directory first
     snprintf(tmux_cmd, sizeof(tmux_cmd),
-             "tmux new-window -n '%s' '%s; echo; echo \"[Process finished - Press Enter to close]\"; read'",
-             app->name, app->executable_path);
+             "tmux new-window -n '%s' 'cd \"%s\" && %s; echo; echo \"[Process finished - Press Enter to close]\"; read'",
+             app->name, cwd, app->executable_path);
 
     pid = fork();
     if (pid == 0) {
@@ -144,15 +151,26 @@ static pid_t launch_in_tmux(AppDescriptor* app) {
  * Returns: PID of child process, or -1 on failure
  */
 static pid_t launch_in_xterm(AppDescriptor* app) {
+    char cmd[2048];
+    char cwd[1024];
     pid_t pid = fork();
 
     if (pid == 0) {
+        // Get current working directory
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            // Create command that changes to the correct directory first
+            snprintf(cmd, sizeof(cmd), "cd \"%s\" && %s", cwd, app->executable_path);
+        } else {
+            // Fallback if getcwd fails
+            snprintf(cmd, sizeof(cmd), "%s", app->executable_path);
+        }
+
         // Child: launch xterm
         setsid();  // Create new session
         execlp("xterm", "xterm",
                "-T", app->name,
                "-e", "sh", "-c",
-               app->executable_path,
+               cmd,
                NULL);
         exit(1);
     }
@@ -171,14 +189,25 @@ static pid_t launch_in_xterm(AppDescriptor* app) {
  * Returns: PID of child process, or -1 on failure
  */
 static pid_t launch_in_gnome_terminal(AppDescriptor* app) {
+    char cmd[2048];
+    char cwd[1024];
     pid_t pid = fork();
 
     if (pid == 0) {
+        // Get current working directory
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            // Create command that changes to the correct directory first
+            snprintf(cmd, sizeof(cmd), "cd \"%s\" && %s", cwd, app->executable_path);
+        } else {
+            // Fallback if getcwd fails
+            snprintf(cmd, sizeof(cmd), "%s", app->executable_path);
+        }
+
         // Child: launch gnome-terminal
         setsid();
         execlp("gnome-terminal", "gnome-terminal",
                "--title", app->name,
-               "--", app->executable_path,
+               "--", "sh", "-c", cmd,
                NULL);
         exit(1);
     }
