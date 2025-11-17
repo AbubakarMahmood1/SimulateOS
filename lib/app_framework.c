@@ -81,9 +81,28 @@ static AppDescriptor* find_app_by_id(int app_id) {
  * Returns: 1 if command exists, 0 otherwise
  */
 static int check_command_exists(const char* command) {
-    char check_cmd[256];
-    snprintf(check_cmd, sizeof(check_cmd), "command -v %s >/dev/null 2>&1", command);
-    return system(check_cmd) == 0;
+    char* path_env = getenv("PATH");
+    if (path_env == NULL) {
+        return 0;
+    }
+
+    char path_copy[4096];
+    strncpy(path_copy, path_env, sizeof(path_copy) - 1);
+    path_copy[sizeof(path_copy) - 1] = '\0';
+
+    char* dir = strtok(path_copy, ":");
+    while (dir != NULL) {
+        char full_path[1024];
+        snprintf(full_path, sizeof(full_path), "%s/%s", dir, command);
+
+        if (access(full_path, X_OK) == 0) {
+            return 1;  // Found and executable
+        }
+
+        dir = strtok(NULL, ":");
+    }
+
+    return 0;  // Not found
 }
 
 /**
