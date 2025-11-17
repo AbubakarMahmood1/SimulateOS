@@ -123,6 +123,26 @@ void boot_sequence(SystemConfig* config) {
            config->os_name, config->os_version);
     printf("================================================================================\n");
     printf("\n");
+
+    // Display terminal window information
+    printf("[ TERMINAL WINDOW SUPPORT ]\n");
+    printf("───────────────────────────────────────────────────────────────────────────────\n");
+
+    if (getenv("TMUX") != NULL) {
+        printf("  ✓ tmux detected: Apps will launch in separate tmux windows\n");
+        printf("    [Use Ctrl+B then number keys to switch between windows]\n");
+    } else if (getenv("DISPLAY") != NULL) {
+        printf("  ✓ X11 detected: Apps will launch in separate xterm windows\n");
+        printf("    [Recommended: Run in tmux for better experience]\n");
+        printf("    [To use tmux: Close this, run 'tmux', then run './bin/minios']\n");
+    } else {
+        printf("  ⚠ No GUI or tmux detected: Apps will run in background\n");
+        printf("    [RECOMMENDED: Run 'tmux' first, then run './bin/minios']\n");
+        printf("    [This will show each app in a separate tmux window]\n");
+    }
+
+    printf("───────────────────────────────────────────────────────────────────────────────\n");
+    printf("\n");
     sleep(2);
 }
 

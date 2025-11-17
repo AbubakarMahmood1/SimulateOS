@@ -4,7 +4,7 @@
 # Compiler and flags
 CC = gcc
 CFLAGS = -Wall -Wextra -pthread -I./include
-LDFLAGS = -pthread
+LDFLAGS = -pthread -lm
 
 # Directories
 KERNEL_DIR = kernel
