@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 #include <sys/wait.h>
 
 // Application descriptors for all available apps
@@ -131,8 +132,38 @@ int launch_application(const char* app_name, AppDescriptor* app,
     // Add to scheduler
     enqueue_process(scheduler, process);
 
-    printf("[App Launcher] Successfully launched: %s (PID=%d)\n",
-           app->name, process->pid);
+    // Fork and execute the actual application
+    pid_t child_pid = fork();
+
+    if (child_pid == -1) {
+        perror("[App Launcher] Fork failed");
+        // Cleanup on fork failure
+        deallocate_memory(resources, app->memory_required, app->hdd_required);
+        release_resources(banker, app->app_id, app->memory_required,
+                         app->hdd_required, app->cpu_cores_needed);
+        terminate_process(process, resources);
+        return -1;
+    }
+
+    if (child_pid == 0) {
+        // Child process - execute the application
+        printf("[App Launcher] Executing: %s (System PID=%d)\n",
+               app->executable_path, getpid());
+
+        // Execute the application
+        execl(app->executable_path, app->name, NULL);
+
+        // If exec fails, we get here
+        perror("[App Launcher] Exec failed");
+        exit(1);
+    }
+
+    // Parent process - track the child
+    process->system_pid = child_pid;
+    update_process_state(process, PROCESS_RUNNING);
+
+    printf("[App Launcher] Successfully launched: %s (PID=%d, System PID=%d)\n",
+           app->name, process->pid, child_pid);
 
     return process->pid;
 }
@@ -176,8 +207,19 @@ bool kill_application(int pid, SystemResources* resources) {
         return false;
     }
 
-    printf("[App Launcher] Terminating process: %s (PID=%d)\n",
-           process->name, pid);
+    printf("[App Launcher] Terminating process: %s (PID=%d, System PID=%d)\n",
+           process->name, pid, process->system_pid);
+
+    // Kill the actual system process if it exists
+    if (process->system_pid > 0) {
+        if (kill(process->system_pid, SIGTERM) == 0) {
+            printf("[App Launcher] Sent SIGTERM to system PID %d\n", process->system_pid);
+            // Wait for process to terminate
+            waitpid(process->system_pid, NULL, WNOHANG);
+        } else {
+            perror("[App Launcher] Failed to kill process");
+        }
+    }
 
     // Free memory
     deallocate_memory(resources, process->memory_required, process->hdd_required);
