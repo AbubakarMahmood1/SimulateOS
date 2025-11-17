@@ -275,6 +275,7 @@ static pid_t launch_in_terminal(AppDescriptor* app, Process* process) {
 int launch_application(const char* app_name, AppDescriptor* app,
                       SystemResources* resources, MultilevelScheduler* scheduler,
                       BankerState* banker) {
+    (void)app_name;  // Parameter kept for API consistency
 
     if (app == NULL) {
         printf("[App Launcher] Error: Invalid application\n");
@@ -417,7 +418,7 @@ void print_available_apps(void) {
         printf("║  %-74s║\n", "──────────────────────────────────────");
 
         for (int i = 0; i < num_apps; i++) {
-            if (available_apps[i].category == cat) {
+            if (available_apps[i].category == (AppCategory)cat) {
                 printf("║  %2d. %-40s  RAM:%4dMB HDD:%4dMB      ║\n",
                        available_apps[i].app_id,
                        available_apps[i].name,
